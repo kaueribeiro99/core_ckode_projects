@@ -11,6 +11,8 @@ from datetime import timedelta
 from django.utils import timezone
 from django.http import JsonResponse
 from django.db import connection
+from django.db.models import Count, F, FloatField, Value, When, CharField, Case
+from django.db.models.functions import Cast
 
 
 class AuthenticateView(TokenObtainPairView):
@@ -75,7 +77,8 @@ class UserView(APIView):
 
 
 class LeadView(APIView):
-    permission_classes = [IsAuthenticated]  # Aqui estou configurando a view para exigir um token de autenticação para ser acessada.
+    permission_classes = [
+        IsAuthenticated]  # Aqui estou configurando a view para exigir um token de autenticação para ser acessada.
 
     def post(self, request):
         serializer = LeadSerializer(data=request.data)
@@ -104,7 +107,8 @@ class LeadView(APIView):
 
 
 class ProjectView(APIView):
-    permission_classes = [IsAuthenticated]  # Aqui estou configurando a view para exigir um token de autenticação para ser acessada.
+    permission_classes = [
+        IsAuthenticated]  # Aqui estou configurando a view para exigir um token de autenticação para ser acessada.
 
     def post(self, request):
         serializer = ProjectSerializer(data=request.data)
@@ -136,55 +140,50 @@ class ProjectStatusPercentageView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT CASE "
-                           "WHEN status = 1 THEN 'In Progress' "
-                           "WHEN status = 2 THEN 'Finished' "
-                           "WHEN status = 3 THEN 'Closed' "
-                           "WHEN status = 4 THEN 'Proposal' "
-                           "END AS status_name, ROUND((COUNT(*) * "
-                           "100.0) / (SELECT COUNT(*) FROM ckode_projects.projects), 2) AS percentage FROM "
-                           "ckode_projects.projects GROUP BY status_name;"
-                           "ORDER BY CASE "
-                           "WHEN status = 1 THEN 0 "
-                           "WHEN status = 4 THEN 1 "
-                           "WHEN status = 2 THEN 2 "
-                           "WHEN status = 3 THEN 3 "
-                           "END;")
-            data = cursor.fetchall()
-            columns = [column[0] for column in cursor.description]
-            result = []
-            for row in data:
-                row_dict = dict(zip(columns, row))
-                row_dict['percentage'] = float(row_dict['percentage'])  # Converter para float
-                result.append(row_dict)
-        return JsonResponse(result, safe=False)
+        total_projects = Project.objects.count()
+        status_percentage = Project.objects.values('status').annotate(status_name=Case
+            (
+                When(status=1, then=Value('In Progress')),
+                When(status=2, then=Value('Finished')),
+                When(status=3, then=Value('Closed')),
+                When(status=4, then=Value('Proposal')),
+                output_field=CharField()
+            ),
+                count=Count('id'),).annotate(percentage=Cast(F('count') * 100.0 / total_projects, output_field=FloatField())).values('status_name', 'percentage').order_by(Case
+            (
+                When(status=1, then=Value(0)),
+                When(status=4, then=Value(1)),
+                When(status=2, then=Value(2)),
+                When(status=3, then=Value(3)),
+                default=Value(4)
+            )
+        )
+
+        result = list(status_percentage)
+        return Response(result)
 
 
 class ProjectStatusView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT CASE "
-                           "WHEN status = 1 THEN 'In Progress' "
-                           "WHEN status = 2 THEN 'Finished' "
-                           "WHEN status = 3 THEN 'Closed' "
-                           "WHEN status = 4 THEN 'Proposal' "
-                           "END AS status_name, "
-                           "COUNT(*) AS quantity FROM ckode_projects.projects "
-                           "WHERE status IN (1, 2, 3, 4) GROUP BY status_name "
-                           "ORDER BY CASE "
-                           "WHEN status = 1 THEN 0 "
-                           "WHEN status = 4 THEN 1 "
-                           "WHEN status = 2 THEN 2 "
-                           "WHEN status = 3 THEN 3 "
-                           "END;")
-            data = cursor.fetchall()
-            columns = [column[0] for column in cursor.description]
-            result = []
-            for row in data:
-                row_dict = dict(zip(columns, row))
-                row_dict['quantity'] = int(row_dict['quantity'])  # Converter para int
-                result.append(row_dict)
-        return JsonResponse(result, safe=False)
+        project_statuses = Project.objects.filter(status__in=[1, 2, 3, 4]).values('status').annotate(status_name=Case
+            (
+                When(status=1, then=Value('In Progress')),
+                When(status=2, then=Value('Finished')),
+                When(status=3, then=Value('Closed')),
+                When(status=4, then=Value('Proposal')),
+                output_field=CharField()
+            ),
+            quantity=Count('id')).order_by(Case
+            (
+                When(status=1, then=Value(0)),
+                When(status=4, then=Value(1)),
+                When(status=2, then=Value(2)),
+                When(status=3, then=Value(3)),
+                default=Value(4)
+            )
+        )
+
+        result = list(project_statuses)
+        return Response(result)

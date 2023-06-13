@@ -46,7 +46,8 @@ class LeadSerializer(serializers.ModelSerializer):
 
 
 class ProjectSerializer(serializers.ModelSerializer):
-    lead_name = serializers.CharField(source='lead.name', read_only=True)  # Campo de leitura adicional para o nome do lead no serializer de Projects
+    lead_name = serializers.CharField(source='lead.name', read_only=True)  # Campo de leitura adicional para mostrar o nome do lead no serializer de Projects
+    lead_company = serializers.CharField(source='lead.company', read_only=True)  # Campo de leitura adicional para mostrar a empresa do lead no serializer de Projects
 
     class Meta:
         model = Project
