@@ -12,8 +12,6 @@ Este projeto é uma API inicialmente criada para gerenciar leads e planejar os m
 
 O projeto foi desenvolvido utilizando as seguintes tecnologias:
 
-- **Front-end**: HTML, CSS e Typescript usando o framework Angular com Angular Material e Bootstrap para criar a interface interativa e responsiva.
-
 - **Back-end**: Python e o framework Django para criar a API REST que gerencia os dados de leads, projetos e usuários.
 
 - **Banco de Dados**: MySQL foi utilizado para armazenar os dados dos leads, projetos e usuários de forma segura.
